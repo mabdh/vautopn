@@ -1,0 +1,182 @@
+#!/bin/bash
+
+CONFIG_FILE_PATH=~/.vautopn.mobileconfig
+
+_vautopn_config_dir=~/.config/vautopn
+_vautopn_project_dir=~/.vautopn
+
+function _vautopn_init() {
+  echo -n "Add your Secret Key: "
+  read -s secret_key
+  echo "**********"
+
+  echo 'Storing secret in keychain...'
+  old_secret=~/.config/vautopn/secret
+  [ -f "$old_secret" ] && rm "$old_secret"
+  security delete-generic-password -a vautopn -s vautopn &>/dev/null
+  security add-generic-password -a vautopn -p "$secret_key" -s vautopn
+
+  _vautopn_vpn_refresh
+
+  echo -e "\nAnd\nSecret Key Added."
+  exit
+}
+
+function _vautopn_vpn_refresh() {
+  local backup_file=/tmp/vautopn-vpns-$(date +%-H-%M-%S-%F)
+  [ -f $_vautopn_config_dir/vpns ] && cp $_vautopn_config_dir/vpns $backup_file
+  cat $CONFIG_FILE_PATH | /usr/bin/awk '{print $0;}' | grep -A1 UserDefinedName | grep string | cut -f 2 -d\> | cut -f 1 -d\< | tr ' ' _ | sed 's/^[[:space:]]//g' >$_vautopn_config_dir/vpns
+
+
+  echo "Storing the VPN list..."
+  if [ -f $backup_file ]; then
+    echo -e "\nDiff:\n$(diff -y $backup_file $_vautopn_config_dir/vpns)"
+  else
+    echo -e "\nVPN List:"
+    cat $_vautopn_config_dir/vpns | nl
+  fi
+}
+
+function _vautopn_usage() {
+  cat <<EOF
+
+USAGE:
+
+vautopn - Shell function to fuzzy search an IPSec VPN by name
+               and connect to it automatically.
+
+-i    - Initialize vautopn. Stores the TOTP secret and VPN list.
+-r    - Refresh vpn list in ~/.config/vautopn .
+-n    - Do not fill the password automatically. Instead copy the password to clipboard.
+-h    - Show this help.
+EOF
+}
+
+function _vautopn_get_totp() {
+  secret_key=$1
+  password=$(oathtool --totp --base32 $secret_key)
+  return 0
+}
+
+function _vautopn() {
+  vpn_name=$(echo $1|tr _ ' ')
+  _vautopn_get_totp $2
+  local autofill=$3
+
+  if [ -z "$password" ]; then
+      echo "Error: Unable to generate otp using oathtool."
+      return 1
+  elif [ "$autofill" == "false" ]; then
+    echo -n "$password" | pbcopy
+  fi
+
+
+	osx_vpn_name="${vpn_name}, Not Connected"
+
+  echo "Connecting to: "$vpn_name
+
+  osascript -e '
+    tell application "System Preferences"
+      reveal pane "Network"
+      activate
+
+      tell application "System Events"
+        tell process "System Preferences"
+          tell window 1
+            repeat with r in rows of table 1 of scroll area 1
+              if (value of attribute "AXValue" of static text 1 of r as string) is equal to "'"$osx_vpn_name"'" then
+                select r
+
+                tell group 1
+                  click button "Authentication Settings…"
+                end tell
+
+                tell sheet 1
+                  set focused of text field 2 to true
+                  set value of text field 2 to "'"$password"'"
+                  click button "Ok"
+                end tell
+
+                click button "Apply"
+
+                delay 1
+
+                tell group 1                        
+                  click button "Connect"
+                end tell
+              end if
+            end repeat
+          end tell
+        end tell
+      end tell
+
+      quit
+    end tell
+  '
+}
+
+function check_mobileconfig(){
+  if [ ! -f $CONFIG_FILE_PATH ]; then
+    echo Download your .mobileconfig from gate and
+    echo save it as $CONFIG_FILE_PATH.
+    echo Eg. cp Downloads/email@address.com.mobileconfig $CONFIG_FILE_PATH
+    exit 1
+  fi
+}
+
+function vautopn() {
+
+  local OPTIND
+  local autofill="true"
+  mkdir -p $_vautopn_config_dir
+
+  check_mobileconfig
+
+  if [ ! -f $_vautopn_config_dir/vpns ]; then
+    _vautopn_init
+  fi
+
+  while getopts "irnh" opt; do
+    case $opt in
+    h)
+      _vautopn_usage
+      return 0
+      ;;
+    i)
+      _vautopn_init
+      return 0
+      ;;
+    r)
+      echo "Refreshing VPN list..."
+      _vautopn_vpn_refresh
+      return 0
+      ;;
+    n)
+      autofill="false"
+      shift $((OPTIND - 1))
+      ;;
+    \?)
+      echo "Invalid Option: -$OPTARG."
+      _vautopn_usage
+      return 1
+      ;;
+    :)
+      echo "Option -$OPTARG requires an argument."
+      _vautopn_usage
+      return 1
+      ;;
+    esac
+  done
+
+  local secret=$(security find-generic-password -a vautopn -w 2>/dev/null | tr -d '\n')
+  if [ -z "$secret" ]; then
+    echo "Secret not found in keychain. Initialize vautopn and try again."
+    return 1
+  fi
+
+  vpn_name=$(cat $_vautopn_config_dir/vpns |
+    fzf --height=10 --ansi --reverse --query "$*" --select-1)
+  [ -z "$vpn_name" ] || _vautopn "$vpn_name" "$secret" "$autofill"
+}
+
+vautopn "$@"
