@@ -99,7 +99,7 @@ function _vautopn() {
 
                 click button "Apply"
 
-                delay 1
+                delay 2
 
                 tell group 1                        
                   click button "Connect"
