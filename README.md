@@ -1,7 +1,9 @@
 # vautopn
 
+# THIS REPO WILL NOT BE MAINTAINED ANYMORE SINCE [lazy-connect](https://github.com/thecasualcoder/lazy-connect) ALREADY SUPPORT MOJAVE
+
 a shell function to fuzzy search an IPSec VPN by name and connect to it automatically.
-inspired by lazy-connect
+inspired by [lazy-connect](https://github.com/thecasualcoder/lazy-connect)
 modified to run in mojave
 
 ## Install
