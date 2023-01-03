@@ -17,7 +17,7 @@ jobs:
           # The name of the homebrew tap to publish your formula to as it appears on GitHub.
           # Required - strings.
           homebrew_owner: mabdh
-          homebrew_tap: repo
+          homebrew_tap: homebrew-repo
 
           # The name of the folder in your homebrew tap where formula will be committed to.
           # Default is shown - string.
