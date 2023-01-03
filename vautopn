@@ -39,12 +39,9 @@ function _vautopn_vpn_refresh() {
 
 function _vautopn_usage() {
   cat <<EOF
-
 USAGE:
-
 vautopn - Shell function to fuzzy search an IPSec VPN by name
                and connect to it automatically.
-
 -i    - Initialize vautopn. Stores the TOTP secret and VPN list.
 -r    - Refresh vpn list in ~/.config/vautopn .
 -n    - Do not fill the password automatically. Instead copy the password to clipboard.
@@ -79,28 +76,23 @@ function _vautopn() {
     tell application "System Preferences"
       reveal pane "Network"
       activate
-
       tell application "System Events"
         tell process "System Preferences"
           tell window 1
+            delay 1
             repeat with r in rows of table 1 of scroll area 1
               if (value of attribute "AXValue" of static text 1 of r as string) is equal to "'"$osx_vpn_name"'" then
                 select r
-
                 tell group 1
                   click button "Authentication Settings…"
                 end tell
-
                 tell sheet 1
                   set focused of text field 2 to true
                   set value of text field 2 to "'"$password"'"
                   click button "Ok"
                 end tell
-
                 click button "Apply"
-
                 delay 1
-
                 tell group 1                        
                   click button "Connect"
                 end tell
@@ -109,7 +101,6 @@ function _vautopn() {
           end tell
         end tell
       end tell
-
       quit
     end tell
   '
@@ -122,7 +113,7 @@ function vautopn() {
   mkdir -p $_vautopn_config_dir
 
   if [ ! -f $CONFIG_FILE_PATH ]; then
-    echo Download your .mobileconfig from gate and
+    echo Download your .mobileconfig 
     echo save it as $CONFIG_FILE_PATH.
     echo Eg. cp ~/Downloads/email@address.com.mobileconfig $CONFIG_FILE_PATH
     exit 1
